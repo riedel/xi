@@ -11,7 +11,11 @@ import java.awt.image.*;
 import javax.xml.transform.*;
 import java.awt.datatransfer.*;
 import java.text.MessageFormat;
-import javax.swing.JProgressBar;
+
+import org.ananas.hc.*;
+import javax.xml.parsers.*;
+import org.xml.sax.*;
+import org.xml.sax.helpers.*;
 
 public class XIFrame
    extends Frame
@@ -70,9 +74,12 @@ public class XIFrame
       else if(x instanceof IOException)
          display((IOException)x);
       else
+      {
+         log(x);
          display("{0}: {1}",
                  new Object[] { x.getClass().getName(),
                                 x.getMessage() });
+      }
    }
 
    public void display(SAXException x)
@@ -82,8 +89,11 @@ public class XIFrame
       else if(x.getException() != null)
          display(x.getException());
       else
+      {
+         log(x);
          display("SAX: {0}",
                  new Object[] { x.getMessage() });
+      }
    }
 
    public void display(SAXParseException x)
@@ -96,14 +106,15 @@ public class XIFrame
       {
          // translate into platform-specific file name
          // (more readable)
-         URI uri = new URI(x.getSystemId());                 
-         if(uri.getScheme().equals("file"))
-            systemId = new File(uri).getPath();
+         URL url = new URL(x.getSystemId());                 
+         if(url.getProtocol().equals("file"))
+            systemId = new File(url.getPath(),url.getFile()).getPath();
       }
-      catch(URISyntaxException ex)
+      catch(MalformedURLException ex)
          { }
       if(systemId == null)
          systemId = x.getSystemId();
+      log(x);
       display(pattern,
               new Object[] { x.getMessage(),
                              systemId,
@@ -113,6 +124,7 @@ public class XIFrame
 
    public void display(IOException x)
    {
+      log(x);
       display("I/O: {0}",
               new Object[] { x.getMessage() });
    }
@@ -122,8 +134,16 @@ public class XIFrame
       if(x.getException() != null)
          display(x.getException());
       else
+      {
+         log(x);
          display("Transform: {0}",
                  new Object[] { x.getMessageAndLocation() });
+      }
+   }
+
+   public void log(Throwable x)
+   {
+      x.printStackTrace();
    }
 
    public void click(Properties properties)
@@ -171,7 +191,7 @@ public class XIFrame
          public void windowClosing(WindowEvent e)
             { doClose(); }
       });
-      DropTarget dp = new DropTarget(this,new DropTargetAdapter()
+      DropTarget dp = new DropTarget(this,new DropTargetListener()
       {
          public void dragEnter(DropTargetDragEvent e)
             { doDrag(e); }
@@ -179,6 +199,8 @@ public class XIFrame
             { doDrag(e); }
          public void dropActionChanged(DropTargetDragEvent e)
             { doDrag(e); }
+         public void dragExit(DropTargetEvent e)
+            { }
          public void drop(DropTargetDropEvent e)
             { doDrop(e); }
       });
@@ -241,6 +263,43 @@ public class XIFrame
       constraints.fill = GridBagConstraints.NONE;
       layout.setConstraints(open,constraints);
       add(open);
+      
+      MenuBar bar = new MenuBar();
+      Menu menu = new Menu("Editor");
+      bar.add(menu);
+      MenuItem item = new MenuItem("Launch...");
+      menu.add(item);
+      item.addActionListener(new ActionListener()
+      {
+         public void actionPerformed(ActionEvent event)
+         {
+            Frame frame = new Frame("Editor");
+            frame.setSize(600,300);
+            EditorPanel panel = new EditorPanel();
+            try
+            {
+               SAXParserFactory factory = SAXParserFactory.newInstance();
+               factory.setNamespaceAware(true);
+               SAXParser parser = factory.newSAXParser();
+               XMLReader reader = parser.getXMLReader();
+               RulesHandler rulesHandler = new RulesHandler();
+               reader.setContentHandler(new XPathHandler(rulesHandler));
+               reader.parse(new InputSource("rules/e205 de.xsl"));
+               Ruleset[] rulesets = rulesHandler.getRulesets();
+               if(rulesets == null)
+                  return;
+               else
+                  panel.setRulesets(rulesets);
+            }
+            catch(Throwable x)
+            {
+               display(x);
+            }
+            frame.add(panel);
+            frame.show();
+         }
+      });
+      setMenuBar(bar);
    }
 
    private void doClose()

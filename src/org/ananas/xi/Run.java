@@ -15,8 +15,9 @@ public class Run
          frame.show();
          try
          {
-            frame.init(makeLinks());
-            frame.click(parseArguments(frame,arguments));
+            Properties properties = parseArguments(frame,arguments);
+            frame.init(makeLinks(frame,properties));
+            frame.click(properties);
          }
          catch(Exception x)
          {
@@ -30,6 +31,8 @@ public class Run
          // in most cases, the console won't be on screen
          // the best workaround is probably to store the exception
          // details in a file
+         // just in case there's a console somewhere, I put a
+         // warning up
          try
          {
             PrintWriter writer =
@@ -41,17 +44,24 @@ public class Run
             System.err.println("See fatal.log for details...");
          }
          catch(IOException x2)
-            { /* total failure, what can I do? */ }
+         {
+            // total failure, try the console instead
+            x2.printStackTrace();
+         }
          System.exit(1);
       }
    }
 
-   private static XSLTLink[] makeLinks()
-      throws IOException, SAXException,
-             TransformerConfigurationException
+   private static XSLTLink[] makeLinks(XIFrame frame,
+                                       Properties properties)
+      throws IOException
    {
-      File rules = new File("rules"),
-           output = new File("output");
+      String rulesSt = properties.getProperty("rulesDir"),
+             outputSt = properties.getProperty("outputDir");
+      File rules = rulesSt == null ? new File("rules") :
+                                     new File(rulesSt),
+           output = outputSt == null ? new File("output") :
+                                       new File(outputSt);
       output.mkdirs();
       File[] ruleFiles = rules.listFiles(new FilenameFilter()
       {
@@ -66,9 +76,18 @@ public class Run
             return false;
          }
       }); 
+      if(ruleFiles == null)
+         return new XSLTLink[0];
       XSLTLink[] links = new XSLTLink[ruleFiles.length];
       for(int i = 0;i < ruleFiles.length;i++)
-         links[i] = new XSLTLink(ruleFiles[i],output);
+         try
+         {
+            links[i] = new XSLTLink(ruleFiles[i],output);
+         }
+         catch(Exception x)
+         {
+            frame.display(x);
+         }
       return links;
    }
 
@@ -78,6 +97,8 @@ public class Run
       Properties properties = new Properties();
       boolean input = false,
               rule = false,
+              rulesDir = false,
+              outputDir = false,
               overwrite = false,
               reload = false,
               autoclose = false;
@@ -90,6 +111,8 @@ public class Run
                           + File.pathSeparator + "filename"
                           + File.pathSeparator + "...]");
             frame.display("  -rule rulename");
+            frame.display("  -rulesdir directory");
+            frame.display("  -outputdir directory");
             frame.display("  -overwrite true | false");
             frame.display("  -reload true | false");
             frame.display("  -autoclose true | false");
@@ -103,6 +126,16 @@ public class Run
          {
             properties.setProperty("rule",arguments[i]);
             rule = false;
+         }
+         else if(rulesDir)
+         {
+            properties.setProperty("rulesDir",arguments[i]);
+            rulesDir = false;
+         }
+         else if(outputDir)
+         {
+            properties.setProperty("outputDir",arguments[i]);
+            outputDir = false;
          }
          else if(overwrite)
          {
@@ -123,6 +156,10 @@ public class Run
             input = true;
          else if(arguments[i].equals("-rule"))
             rule = true;
+         else if(arguments[i].equals("-rulesdir"))
+            rulesDir = true;
+         else if(arguments[i].equals("-outputdir"))
+            outputDir = true;
          else if(arguments[i].equals("-overwrite"))
             overwrite = true;
          else if(arguments[i].equals("-reload"))

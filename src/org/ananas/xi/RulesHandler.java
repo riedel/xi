@@ -13,6 +13,9 @@ public class RulesHandler
    private String namespaceURI = null;
    private String prefix = null;
    private List rulesets = null;
+   private StringBuffer buffer = null;
+   private boolean defaultTrimSpace = false,
+                   defaultIgnoreEmpty = false;
 
    private Ruleset getLastRuleset()
    {
@@ -23,6 +26,7 @@ public class RulesHandler
     * @xpath xi:rules
     */
    public void init(Attributes attributes)
+      throws SAXException
    {
       rulesets = new ArrayList();
       namespaceURI = attributes.getValue("targetNamespace");
@@ -38,6 +42,28 @@ public class RulesHandler
          prefix = prefix.trim();
          if(prefix.equals(""))
             prefix = null;
+      }
+      String space = attributes.getValue("defaultSpace");
+      if(space != null)
+      {
+         space = space.trim();
+         if(space.equalsIgnoreCase("trim"))
+            defaultTrimSpace = true;
+         else if(space.equalsIgnoreCase("preserve"))
+            ;   // leaves it to default...
+         else
+            throw new SAXException("acceptable values for defaultSpace are trim and preserve");
+      }
+      String empty = attributes.getValue("defaultEmpty");
+      if(empty != null)
+      {
+         empty = empty.trim();
+         if(empty.equalsIgnoreCase("ignore"))
+            defaultIgnoreEmpty = true;
+         else if(empty.equalsIgnoreCase("preserve"))
+            ;   // leaves it to default...
+         else
+            throw new SAXException("acceptable values for defaultEmpty are ignore and preserve");
       }
    }
 
@@ -64,16 +90,34 @@ public class RulesHandler
    {
       String name = attributes.getValue("name"),
              pattern = attributes.getValue("pattern");
-      if(name != null && pattern != null)
+      if(name != null)
       {
          Ruleset ruleset = getLastRuleset();
-         ruleset.addMatch(new Match(namespaceURI,
-                                    name,
-                                    prefix,
-                                    pattern));
+         ruleset.addMatch(MatchFactory.createMatch(namespaceURI,
+                                                   name,
+                                                   prefix,
+                                                   pattern));
+         if(pattern == null)
+            buffer = new StringBuffer();
+         else
+            buffer = null;
       }
       else
-         throw new SAXException("name and pattern attributes required for xi:match");
+         throw new SAXException("name attribute required for xi:match");
+   }
+
+   /**
+    * @xpath xi:rules/xi:ruleset/xi:match
+    */
+   public void endMatch()
+      throws SAXException
+   {
+      if(buffer != null)
+      {
+         Ruleset ruleset = getLastRuleset();
+         Match match = ruleset.getLastMatch();
+         match.setPattern(buffer.toString());
+      }
    }
 
    /**
@@ -101,23 +145,84 @@ public class RulesHandler
    public void doGroup(Attributes attributes)
       throws SAXException
    {
-      String name = attributes.getValue("name");
+      String name = attributes.getValue("name"),
+             space = attributes.getValue("space"),
+             empty = attributes.getValue("empty");
+      boolean trimSpace = defaultTrimSpace;
+      if(space != null)
+      {
+         space = space.trim();
+         if(space.equalsIgnoreCase("trim"))
+            trimSpace = true;
+         else if(space.equalsIgnoreCase("preserve"))
+            trimSpace = false;
+         else
+            throw new SAXException("acceptable values for space are trim and preserve");
+      }
+      boolean ignoreEmpty = defaultIgnoreEmpty;
+      if(empty != null)
+      {
+         empty = empty.trim();
+         if(empty.equalsIgnoreCase("ignore"))
+            ignoreEmpty = true;
+         else if(empty.equalsIgnoreCase("preserve"))
+            ignoreEmpty = false;
+         else
+            throw new SAXException("acceptable values for empty are ignore and preserve");
+      }
       if(name != null)
       {
          Ruleset ruleset = getLastRuleset();
          Match match = ruleset.getLastMatch();
          match.addGroup(new Group(namespaceURI,
                                   name,
-                                  prefix));
+                                  prefix,
+                                  trimSpace,
+                                  ignoreEmpty));
       }
       else
          throw new SAXException("name attribute required for xi:group");
+      if(buffer != null)
+      {
+         String pattern = attributes.getValue("pattern");
+         if(pattern != null)
+         {
+            buffer.append('(');
+            buffer.append(pattern);
+            buffer.append(')');
+         }
+         else
+            throw new SAXException("pattern attribute required for xi:group if no pattern on the xi:match");
+      }
+   }
+
+   /**
+    * @xpath xi:rules/xi:ruleset/xi:match/xi:filler
+    */
+   public void doFiller(Attributes attributes)
+      throws SAXException
+   {
+      if(buffer != null)
+      {
+         String pattern = attributes.getValue("pattern");
+         if(pattern != null)
+            buffer.append(pattern);
+         else
+            throw new SAXException("pattern attribute required for xi:filler");
+      }
+      else
+         throw new SAXException("xi:filler can only appear if there's no pattern on the xi:match");
    }
 
    public Ruleset[] getRulesets()
    {
-      Ruleset[] array = new Ruleset[rulesets.size()];
-      return (Ruleset[])rulesets.toArray(array);
+      if(rulesets != null && rulesets.size() > 0)
+      {
+         Ruleset[] array = new Ruleset[rulesets.size()];
+         return (Ruleset[])rulesets.toArray(array);
+      }
+      else
+         return null;
    }
 
    public String getNamespaceURI()

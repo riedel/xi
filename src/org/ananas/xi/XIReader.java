@@ -6,7 +6,6 @@ import java.text.*;
 import java.net.URL;    // spell it out to avoid conflict between
 import org.xml.sax.*;   // java.net.* and org.xml.sax.*
 import org.ananas.hc.*;
-import java.util.regex.*;
 import javax.xml.parsers.*;
 import org.xml.sax.helpers.*;
 import java.net.URLConnection;   // spell it out against conflict
@@ -31,7 +30,8 @@ public class XIReader
    protected char[] chars = new char[1024];
    public static final String NAMESPACES_URI = "http://xml.org/sax/features/namespaces",
                               NAMESPACE_PREFIXES_URI = "http://xml.org/sax/features/namespace-prefixes",
-                              RULESETS_URI = "http://ananas.org/xi/properties/rulesets";
+                              RULESETS_URI = "http://ananas.org/xi/properties/rulesets",
+                              RULESETS_VALID_URI = "http://ananas.org/xi/features/rulesets/valid";
 
    public ContentHandler getContentHandler()
    {
@@ -138,6 +138,8 @@ public class XIReader
             reader.setContentHandler(new XPathHandler(rulesHandler));
             reader.parse(input);
             rulesets = rulesHandler.getRulesets();
+            if(rulesets == null)
+               return;
             namespaceURI = rulesHandler.getNamespaceURI();
             prefix = rulesHandler.getPrefix();
             rulesetsMap = new HashMap((int)(rulesets.length * 1.5));
@@ -163,7 +165,6 @@ public class XIReader
                msg = MessageFormat.format(
                         "Cannot create parser (Exception in SAX exception: {0})",
                         new String[] { e.getMessage() });
-            e.printStackTrace();
             throw new SAXNotSupportedException(msg);
          }
          catch(IOException e)
@@ -175,6 +176,11 @@ public class XIReader
          }
    }
 
+   public boolean isRulesetsValid()
+   {
+      return rulesetsMap != null;
+   }
+
    public boolean getFeature(String name)
       throws SAXNotRecognizedException
    {
@@ -182,6 +188,8 @@ public class XIReader
          return isNamespaces();
       else if(name.equals(NAMESPACE_PREFIXES_URI))
          return isNamespacePrefixes();
+      else if(name.equals(RULESETS_VALID_URI))
+         return isRulesetsValid();
       else
          throw new SAXNotRecognizedException(name);
    }
@@ -332,26 +340,31 @@ public class XIReader
                   Group group = match.getGroupNameAt(j);
                   if(contentHandler != null)
                   {
-                     contentHandler.startElement(group.getNamespaceURI(),
-                                                 group.getLocalName(),
-                                                 group.getQualifiedName(),
-                                                 attributes);
                      String value = match.getGroupValueAt(j);
-                     int begin = 0,
-                         end = 0;
-                     while(begin < value.length())
+                     if(group.isTrimSpace() && value != null)
+                        value = value.trim();
+                     if(!group.isIgnoreEmpty() || (value != null && value.length() != 0))
                      {
-                        if(value.length() - begin < chars.length)
-                           end = value.length();
-                        else
-                           end = begin + chars.length;
-                        value.getChars(begin,end,chars,0);
-                        contentHandler.characters(chars,0,end - begin);
-                        begin = end;
+                        contentHandler.startElement(group.getNamespaceURI(),
+                                                    group.getLocalName(),
+                                                    group.getQualifiedName(),
+                                                    attributes);
+                        int begin = 0,
+                            end = 0;
+                        while(begin < value.length())
+                        {
+                           if(value.length() - begin < chars.length)
+                              end = value.length();
+                           else
+                              end = begin + chars.length;
+                           value.getChars(begin,end,chars,0);
+                           contentHandler.characters(chars,0,end - begin);
+                           begin = end;
+                        }
+                        contentHandler.endElement(group.getNamespaceURI(),
+                                                  group.getLocalName(),
+                                                  group.getQualifiedName());
                      }
-                     contentHandler.endElement(group.getNamespaceURI(),
-                                               group.getLocalName(),
-                                               group.getQualifiedName());
                   }
                }
             }

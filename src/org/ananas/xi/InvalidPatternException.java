@@ -1,0 +1,1 @@
+package org.ananas.xi;public class InvalidPatternException   extends RuntimeException{   private Exception wrapped;   public InvalidPatternException(Exception wrapped)   {      super(wrapped == null ? null : wrapped.getMessage());      this.wrapped = wrapped;   }      public Exception getWrappedException()   {      return wrapped;   }}
