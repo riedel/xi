@@ -1,4 +1,0 @@
-note Du texte: <separe par> <un truc>
-alias Deuxieme ligne: encore     
-a c'est ok : la suite
-   a pas ok : la suite

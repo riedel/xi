@@ -1,0 +1,1 @@
+java -classpath lib\xi.jar;lib\hc.jar org.ananas.xi.Run -overwrite false -reload true -rule "Import address book"

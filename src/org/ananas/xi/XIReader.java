@@ -236,60 +236,73 @@ public class XIReader
       try
       {
          BufferedReader reader = new BufferedReader(getReader(source));
-         Ruleset ruleset = rulesets[0];
-         if(contentHandler != null)
+         try
          {
-            contentHandler.setDocumentLocator(this);
-            contentHandler.startDocument();
-            if(namespaceURI != null)
-               if(prefix != null)
-               {
-                  contentHandler.startPrefixMapping(prefix,namespaceURI);
-                  if(namespacePrefixes)
-                     attributes.addAttribute("",
-                                             prefix,
-                                             "xmlns:" + prefix,
-                                             "CDATA",
-                                             namespaceURI);
-               }
-               else
-               {
-                  contentHandler.startPrefixMapping("",namespaceURI);
-                  if(namespacePrefixes)
-                     attributes.addAttribute("",
-                                             "xmlns",
-                                             "xmlns",
-                                             "CDATA",
-                                             namespaceURI);
-               }
-            contentHandler.startElement(ruleset.getNamespaceURI(),
-                                        ruleset.getLocalName(),
-                                        ruleset.getQualifiedName(),
-                                        attributes);
+            doParse(reader);
          }
-         String line = reader.readLine();
-         while(line != null)
+         finally
          {
-            match(ruleset,line,true);
-            line = reader.readLine();
-            lineNumber++;
-         }
-         if(contentHandler != null)
-         {
-            contentHandler.endElement(ruleset.getNamespaceURI(),
-                                      ruleset.getLocalName(),
-                                      ruleset.getQualifiedName());
-            if(namespaceURI != null)
-               if(prefix != null)
-                  contentHandler.endPrefixMapping(prefix);
-               else
-                  contentHandler.endPrefixMapping("");
-            contentHandler.endDocument();
+            reader.close();
          }
       }
       finally
       {
          isParsing = false;
+      }
+   }
+
+   private void doParse(BufferedReader reader)
+      throws IOException, SAXException
+   {
+      Ruleset ruleset = rulesets[0];
+      if(contentHandler != null)
+      {
+         contentHandler.setDocumentLocator(this);
+         contentHandler.startDocument();
+         if(namespaceURI != null)
+            if(prefix != null)
+            {
+               contentHandler.startPrefixMapping(prefix,namespaceURI);
+               if(namespacePrefixes)
+                  attributes.addAttribute("",
+                                          prefix,
+                                          "xmlns:" + prefix,
+                                          "CDATA",
+                                          namespaceURI);
+            }
+            else
+            {
+               contentHandler.startPrefixMapping("",namespaceURI);
+               if(namespacePrefixes)
+                  attributes.addAttribute("",
+                                          "xmlns",
+                                          "xmlns",
+                                          "CDATA",
+                                          namespaceURI);
+            }
+         contentHandler.startElement(ruleset.getNamespaceURI(),
+                                     ruleset.getLocalName(),
+                                     ruleset.getQualifiedName(),
+                                     attributes);
+      }
+      String line = reader.readLine();
+      while(line != null)
+      {
+         match(ruleset,line,true);
+         line = reader.readLine();
+         lineNumber++;
+      }
+      if(contentHandler != null)
+      {
+         contentHandler.endElement(ruleset.getNamespaceURI(),
+                                   ruleset.getLocalName(),
+                                   ruleset.getQualifiedName());
+         if(namespaceURI != null)
+            if(prefix != null)
+               contentHandler.endPrefixMapping(prefix);
+            else
+               contentHandler.endPrefixMapping("");
+         contentHandler.endDocument();
       }
    }
 
@@ -354,7 +367,7 @@ public class XIReader
          else
             i++;
       }
-      if(i < ruleset.getMatchCount()
+      if(i >= ruleset.getMatchCount()
          && ruleset.getError() != null
          && errorHandler != null)
          errorHandler.error(new SAXParseException(ruleset.getError(),

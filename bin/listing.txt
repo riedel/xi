@@ -1,0 +1,6 @@
+alias "jdoe" jdoe@xmli.com
+note "jdoe" <country:US><zip:45202><state:OH><city:Cincinnati><address:34 Fountain Square Plaza><name:John Doe>
+alias "jsmith" jsmith@worth-it.com
+note "jsmith" <first:Jack><last:Smith><name:Jack Smith>
+alias "pdupont" pdupont@pineapples.net
+note "pdupont" <name:Pierre Dupont>
